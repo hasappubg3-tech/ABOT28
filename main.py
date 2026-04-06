@@ -9,7 +9,7 @@ logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=lo
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 DB = "data.db"
 
-ICONS = {"menu": "📂", "text": "📝", "photo": "🖼", "file": "📎", "video": "🎬", "audio": "🎵"}
+ICONS = {"menu": "📂", "text": "📄", "photo": "📄", "file": "📄", "video": "📄", "audio": "📄", "content": "📄"}
 
 # ── أزرار خاصة ───────────────────────────────────────────────────
 BTN_BACK      = "🔙 رجوع"
@@ -19,12 +19,8 @@ BTN_ADMINS    = "👥 مشرفون"
 BTN_CANCEL    = "❌ إلغاء"
 
 TYPE_MAP = {
-    "📂 قائمة": "menu",
-    "📝 نص":    "text",
-    "🖼 صورة":  "photo",
-    "📎 ملف":   "file",
-    "🎬 فيديو": "video",
-    "🎵 صوت":   "audio",
+    "📂 قائمة":  "menu",
+    "📄 محتوى": "content",
 }
 
 ADMIN_BTNS   = {BTN_ADD, BTN_MANAGE, BTN_ADMINS}
@@ -115,9 +111,7 @@ def build_kb(uid, pid=None):
 
 def build_type_kb():
     return ReplyKeyboardMarkup([
-        ["📂 قائمة", "📝 نص"],
-        ["🖼 صورة",  "📎 ملف"],
-        ["🎬 فيديو", "🎵 صوت"],
+        ["📂 قائمة", "📄 محتوى"],
         [BTN_CANCEL],
     ], resize_keyboard=True)
 
@@ -178,6 +172,23 @@ async def set_panel(ctx, chat_id, text, markup=None):
     msg = await ctx.bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
     ctx.user_data["panel_id"] = msg.message_id
 
+# ── اكتشاف نوع المحتوى تلقائياً ─────────────────────────────────
+def detect_content(m):
+    """Returns (type, content, file_id) from a message, or (None,None,None)."""
+    if m.photo:
+        return "photo", m.caption, m.photo[-1].file_id
+    if m.document:
+        return "file", m.caption, m.document.file_id
+    if m.video:
+        return "video", m.caption, m.video.file_id
+    if m.audio:
+        return "audio", m.caption, m.audio.file_id
+    if m.voice:
+        return "audio", m.caption, m.voice.file_id
+    if m.text:
+        return "text", m.text, None
+    return None, None, None
+
 # ── /start ───────────────────────────────────────────────────────
 async def cmd_start(update: Update, ctx):
     uid = update.effective_user.id
@@ -217,21 +228,11 @@ async def on_message(update: Update, ctx):
         return
 
     if state == "wait_content":
-        content = None; fid = None
-        t = ctx.user_data.get("new_type"); add_pid = ctx.user_data.get("add_pid")
+        add_pid = ctx.user_data.get("add_pid")
         label = ctx.user_data.get("new_label", "زر")
-        if t == "text" and m.text and m.text not in SPECIAL_BTNS:
-            content = m.text
-        elif t == "photo" and m.photo:
-            fid = m.photo[-1].file_id; content = m.caption
-        elif t == "file" and m.document:
-            fid = m.document.file_id; content = m.caption
-        elif t == "video" and m.video:
-            fid = m.video.file_id; content = m.caption
-        elif t == "audio" and (m.audio or m.voice):
-            fid = (m.audio or m.voice).file_id; content = m.caption
-        else:
-            await m.reply_text("⚠️ نوع المحتوى غير صحيح. أعد الإرسال."); return
+        t, content, fid = detect_content(m)
+        if t is None:
+            await m.reply_text("⚠️ أرسل نصاً أو صورة أو ملفاً أو فيديو أو صوتاً."); return
         add_btn(add_pid, t, label, content, fid)
         ctx.user_data.pop("state", None)
         await m.reply_text(f"✅ تم إضافة *{label}*", parse_mode="Markdown",
@@ -248,16 +249,14 @@ async def on_message(update: Update, ctx):
         return
 
     if state == "wait_edit_content":
-        bid = ctx.user_data.get("edit_bid"); t = ctx.user_data.get("edit_type")
-        content = None; fid = None
-        if t == "text" and m.text and m.text not in SPECIAL_BTNS: content = m.text
-        elif t == "photo" and m.photo: fid = m.photo[-1].file_id; content = m.caption
-        elif t == "file" and m.document: fid = m.document.file_id; content = m.caption
-        elif t == "video" and m.video: fid = m.video.file_id; content = m.caption
-        elif t == "audio" and (m.audio or m.voice): fid = (m.audio or m.voice).file_id; content = m.caption
-        else: await m.reply_text("⚠️ نوع المحتوى غير صحيح."); return
+        bid = ctx.user_data.get("edit_bid")
+        t, content, fid = detect_content(m)
+        if t is None or (t == "text" and text in SPECIAL_BTNS):
+            await m.reply_text("⚠️ أرسل نصاً أو صورة أو ملفاً أو فيديو أو صوتاً."); return
         upd_btn(bid, content=content, file_id=fid)
         b = get_btn(bid); ep = b["parent_id"] if b else None
+        # update the stored type too
+        conn = db(); conn.execute("UPDATE buttons SET type=? WHERE id=?", (t, bid)); conn.commit(); conn.close()
         ctx.user_data.pop("state", None)
         await set_panel(ctx, chat_id, "✅ تم تحديث المحتوى.", kb_manage(ep))
         await m.reply_text("✅", reply_markup=build_kb(uid, pid))
@@ -392,9 +391,9 @@ async def cb_manage(update: Update, ctx):
     if d.startswith("ec_"):
         bid = int(d[3:]); b = get_btn(bid)
         if b["type"] == "menu": await q.answer("القوائم لا تحتوي محتوى مباشر.", show_alert=True); return
-        ctx.user_data["edit_bid"] = bid; ctx.user_data["edit_type"] = b["type"]
+        ctx.user_data["edit_bid"] = bid
         ctx.user_data["state"] = "wait_edit_content"
-        await q.edit_message_text("✏️ أرسل المحتوى الجديد:", reply_markup=kb_cancel_inline()); return
+        await q.edit_message_text("✏️ أرسل المحتوى الجديد (نص أو صورة أو ملف...):", reply_markup=kb_cancel_inline()); return
 
     if d == "aa":
         ctx.user_data["state"] = "wait_admin_id"
