@@ -37,7 +37,8 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 parent_id INTEGER REFERENCES buttons(id) ON DELETE CASCADE,
                 type TEXT NOT NULL, label TEXT NOT NULL,
-                ord INTEGER DEFAULT 0
+                ord INTEGER DEFAULT 0,
+                new_row INTEGER DEFAULT 1
             );
             CREATE TABLE IF NOT EXISTS content_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,6 +49,11 @@ def init_db():
                 ord INTEGER DEFAULT 0
             );
         """)
+        try:
+            c.execute("ALTER TABLE buttons ADD COLUMN new_row INTEGER DEFAULT 1")
+            c.commit()
+        except Exception:
+            pass
 
 def is_admin(uid):
     return db().execute("SELECT 1 FROM admins WHERE id=?", (uid,)).fetchone() is not None
@@ -112,6 +118,12 @@ def upd_btn_label(bid, label):
 def del_btn(bid):
     c = db(); c.execute("DELETE FROM buttons WHERE id=?", (bid,)); c.commit(); c.close()
 
+def toggle_btn_row(bid):
+    """تبديل حالة بداية السطر للزر (دمج/فصل مع الزر السابق)."""
+    c = db()
+    c.execute("UPDATE buttons SET new_row = 1 - new_row WHERE id=?", (bid,))
+    c.commit(); c.close()
+
 def move_btn(bid, direction):
     c = db(); cur = c.cursor()
     row = dict(cur.execute("SELECT * FROM buttons WHERE id=?", (bid,)).fetchone())
@@ -166,7 +178,16 @@ ICON = {"menu": "📂", "content": "📄"}
 
 def build_kb(uid, pid=None):
     btns = get_buttons(pid)
-    rows = [[KeyboardButton(b['label'])] for b in btns]
+    rows = []
+    current_row = []
+    for i, b in enumerate(btns):
+        if i > 0 and b.get('new_row', 1):
+            if current_row:
+                rows.append(current_row)
+            current_row = []
+        current_row.append(KeyboardButton(b['label']))
+    if current_row:
+        rows.append(current_row)
     if pid is not None:
         rows.append([KeyboardButton(BTN_BACK)])
     if is_admin(uid):
@@ -186,7 +207,18 @@ def kb_manage(pid=None):
     btns = get_buttons(pid)
     if btns:
         rows.append([InlineKeyboardButton("➕ إضافة في البداية", callback_data=f"add_first_{ctx}")])
-    for b in get_buttons(pid):
+    for i, b in enumerate(btns):
+        if i > 0:
+            if b.get('new_row', 1):
+                rows.append([InlineKeyboardButton(
+                    "〰️ سطر جديد  •  اضغط لدمجه مع السابق 🔗",
+                    callback_data=f"row_toggle_{b['id']}"
+                )])
+            else:
+                rows.append([InlineKeyboardButton(
+                    "🔗 نفس السطر  •  اضغط للفصل ✂️",
+                    callback_data=f"row_toggle_{b['id']}"
+                )])
         rows.append([
             InlineKeyboardButton(b['label'], callback_data=f"e_{b['id']}"),
             InlineKeyboardButton("⬆️", callback_data=f"u_{b['id']}"),
@@ -516,6 +548,13 @@ async def cb_manage(update: Update, ctx):
         del_btn(bid)
         await q.edit_message_text("⚙️ *إدارة الأزرار*:", parse_mode="Markdown",
                                   reply_markup=kb_manage(ep)); return
+
+    # ── تبديل دمج/فصل السطر ──────────────────────────────────────
+    if d.startswith("row_toggle_"):
+        bid = int(d[11:]); b = get_btn(bid)
+        toggle_btn_row(bid)
+        await q.edit_message_reply_markup(reply_markup=kb_manage(b["parent_id"] if b else None))
+        return
 
     # ── اختيار موضع الإضافة من لوح الإضافة ──────────────────────
     if d.startswith("pos_first_"):
