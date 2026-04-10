@@ -289,11 +289,6 @@ def should_notify(uid) -> bool:
         return True
     return False
 
-def should_notify_2() -> bool:
-    """النظام 2: هل رسالة الاشتراك العادية مفعّلة؟"""
-    if get_setting("notif2_enabled", "0") != "1":
-        return False
-    return bool(get_setting("notif2_message", "").strip())
 
 async def send_notif_gate(target, uid, bid):
     """يُرسل نافذة التنبيه المنبثقة — المستخدم لا يستطيع تجاوزها."""
@@ -695,19 +690,15 @@ def kb_settings():
     cap_btns = get_caption_buttons()
     notif1_on  = get_setting("notif_enabled", "1") == "1"
     notif1_msg = get_setting("notif_message", "")
-    notif2_on  = get_setting("notif2_enabled", "0") == "1"
-    notif2_msg = get_setting("notif2_message", "")
     cap_label    = "✏️ تغيير كليشة الكلام" if global_cap else "📌 كليشة الكلام"
     capbtn_label = f"🔗 كليشة الأزرار ({len(cap_btns)} زر)" if cap_btns else "🔗 كليشة الأزرار"
     notif1_icon  = "✅" if (notif1_on and notif1_msg) else "⭕"
-    notif2_icon  = "✅" if (notif2_on and notif2_msg) else "⭕"
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("👥 المشرفون",                     callback_data="st_admins")],
         [InlineKeyboardButton("💾 النسخ الاحتياطي",              callback_data="st_backup_menu")],
         [InlineKeyboardButton(cap_label,                         callback_data="st_caption")],
         [InlineKeyboardButton(capbtn_label,                      callback_data="st_capbtn")],
         [InlineKeyboardButton(f"📢 رسالة الاشتراك {notif1_icon}", callback_data="st_notif1")],
-        [InlineKeyboardButton(f"🔔 التنبيه المنبثق {notif2_icon}", callback_data="st_notif2")],
         [InlineKeyboardButton("📊 الإحصائيات",                   callback_data="st_stats")],
     ])
 
@@ -737,24 +728,6 @@ def kb_notif1_settings():
         InlineKeyboardButton(f'زر "نعم": {ok_text}',    callback_data="st_notif_ok_text"),
         InlineKeyboardButton(f'زر "لا": {cancel_text}', callback_data="st_notif_cancel_text"),
     ])
-    rows.append([InlineKeyboardButton("🔙 رجوع", callback_data="st_back")])
-    return InlineKeyboardMarkup(rows)
-
-def kb_notif2_settings():
-    notif2_on    = get_setting("notif2_enabled", "0") == "1"
-    msg          = get_setting("notif2_message", "")
-    chan         = get_setting("notif_channel", "")
-    toggle_label = "🔕 إيقاف التنبيه المنبثق" if notif2_on else "🔔 تفعيل التنبيه المنبثق"
-    rows = []
-    rows.append([InlineKeyboardButton(toggle_label, callback_data="st_notif2_toggle")])
-    rows.append([InlineKeyboardButton(
-        "✏️ تغيير نص الرسالة" if msg else "✏️ كتابة نص الرسالة",
-        callback_data="st_notif2_msg"
-    )])
-    rows.append([InlineKeyboardButton(
-        f"📢 القناة: {chan}" if chan else "📢 تحديد رابط القناة",
-        callback_data="st_notif_chan"
-    )])
     rows.append([InlineKeyboardButton("🔙 رجوع", callback_data="st_back")])
     return InlineKeyboardMarkup(rows)
 
@@ -850,20 +823,6 @@ async def resend_notif_gate(target, uid, bid):
     except Exception:
         pass
 
-async def send_notif2(target):
-    """النظام 2: رسالة اشتراك عادية تُرسل مع كل محتوى للمشتركين."""
-    msg  = get_setting("notif2_message", "🔔 اشترك في قناتنا للاستمتاع بالمحتوى!")
-    chan = get_setting("notif_channel", "").strip()
-    rows = []
-    if chan:
-        url = chan if chan.startswith("http") else f"https://t.me/{chan.lstrip('@')}"
-        rows.append([InlineKeyboardButton("📢 اشترك في القناة", url=url)])
-    markup = InlineKeyboardMarkup(rows) if rows else None
-    try:
-        await target.reply_text(msg, parse_mode="Markdown", reply_markup=markup)
-    except Exception:
-        pass
-
 # ── عرض عناصر المحتوى للمستخدم ───────────────────────────────────
 async def send_items(m, bid, uid=None, bot=None):
     if uid and not is_admin(uid):
@@ -876,10 +835,6 @@ async def send_items(m, bid, uid=None, bot=None):
         # فحص الاشتراك في القناة (مرة واحدة فقط)
         # True = مشترك | False = غير مشترك | None = تعذّر الفحص
         subscribed = await is_subscribed(bot, uid) if bot else None
-
-        # النظام 2: رسالة عادية مع كل محتوى للغير مشتركين
-        if subscribed is False and should_notify_2():
-            await send_notif2(m)
 
         # النظام 1: تحديث العداد وفحص قبل إرسال المحتوى (فقط إذا تأكدنا أنه غير مشترك)
         if subscribed is False:
@@ -1039,16 +994,6 @@ async def on_message(update: Update, ctx):
         ctx.user_data.pop("state", None)
         await set_panel(ctx, chat_id, "📢 *رسالة الاشتراك*", kb_notif1_settings())
         await m.reply_text("✅ تم حفظ نص رسالة الاشتراك.", reply_markup=build_kb(uid, pid))
-        return
-
-    # ── انتظار نص التنبيه المنبثق (النظام 2) ────────────────────
-    if state == "wait_notif2_msg":
-        if not m.text or m.text in SPECIAL_BTNS:
-            await m.reply_text("⚠️ أرسل نصاً صحيحاً للرسالة."); return
-        set_setting("notif2_message", m.text)
-        ctx.user_data.pop("state", None)
-        await set_panel(ctx, chat_id, "🔔 *التنبيه المنبثق*", kb_notif2_settings())
-        await m.reply_text("✅ تم حفظ نص التنبيه المنبثق.", reply_markup=build_kb(uid, pid))
         return
 
     # ── انتظار رابط قناة التنبيه ─────────────────────────────────
@@ -1653,40 +1598,6 @@ async def cb_manage(update: Update, ctx):
             f"🔄 *فترية الجلسات*\n\nالقيمة الحالية: *{every_ses}* جلسات\n\n"
             "أرسل رقماً لتحديد كم جلسة قبل ظهور التنبيه.\n"
             "_أرسل 0 لتعطيل هذا الشرط_",
-            parse_mode="Markdown",
-            reply_markup=kb_cancel_inline()
-        )
-        return
-
-    # ── إعدادات النظام 2: التنبيه المنبثق ────────────────────────
-    if d == "st_notif2":
-        msg   = get_setting("notif2_message", "")
-        chan  = get_setting("notif_channel", "")
-        on    = get_setting("notif2_enabled", "0") == "1"
-        status_txt  = "✅ مفعّل" if on else "⭕ موقوف"
-        msg_preview = f"\n\n📝 *النص:*\n{msg}" if msg else "\n\n📝 لا يوجد نص بعد."
-        chan_txt     = f"\n📢 القناة: `{chan}`" if chan else ""
-        await q.edit_message_text(
-            f"🔔 *التنبيه المنبثق* — {status_txt}\n"
-            f"يظهر مع كل ضغطة على محتوى للغير مشتركين"
-            f"{chan_txt}{msg_preview}",
-            parse_mode="Markdown",
-            reply_markup=kb_notif2_settings()
-        )
-        return
-
-    if d == "st_notif2_toggle":
-        cur = get_setting("notif2_enabled", "0")
-        set_setting("notif2_enabled", "0" if cur == "1" else "1")
-        await q.edit_message_text("🔔 *التنبيه المنبثق*", parse_mode="Markdown",
-                                  reply_markup=kb_notif2_settings())
-        return
-
-    if d == "st_notif2_msg":
-        ctx.user_data["state"] = "wait_notif2_msg"
-        await q.edit_message_text(
-            "✏️ أرسل نص التنبيه المنبثق الذي سيظهر مع كل ضغطة للغير مشتركين:\n\n"
-            "_يمكنك استخدام إيموجي وتنسيق ماركداون_",
             parse_mode="Markdown",
             reply_markup=kb_cancel_inline()
         )
