@@ -566,7 +566,7 @@ def kb_manage(pid=None):
         rows.append([InlineKeyboardButton("🔀 تبديل موضع زرين", callback_data=f"swp_start_{ctx}")])
     if pid is not None:
         b = get_btn(pid); back = b["parent_id"] if b else None
-        rows.append([InlineKeyboardButton("🔙 رجوع", callback_data="m_r" if back is None else f"m_{back}")])
+        rows.append([InlineKeyboardButton("رجوع", callback_data="m_r" if back is None else f"m_{back}")])
     return InlineKeyboardMarkup(rows)
 
 def kb_add_type():
@@ -604,7 +604,7 @@ def kb_edit_menu_btn(bid):
         [InlineKeyboardButton("🗑 حذف",          callback_data=f"confirm_x_{bid}")],
     ]
     pid = b["parent_id"] if b else None
-    rows.append([InlineKeyboardButton("🔙 رجوع", callback_data="m_r" if pid is None else f"m_{pid}")])
+    rows.append([InlineKeyboardButton("رجوع", callback_data="m_r" if pid is None else f"m_{pid}")])
     return InlineKeyboardMarkup(rows)
 
 def kb_content_panel(bid):
@@ -628,7 +628,7 @@ def kb_content_panel(bid):
     rows.append([InlineKeyboardButton("✏️ تغيير الاسم", callback_data=f"el_{bid}")])
     rows.append([InlineKeyboardButton("🗑 حذف الزر",    callback_data=f"confirm_x_{bid}")])
     pid = b["parent_id"] if b else None
-    rows.append([InlineKeyboardButton("🔙 رجوع", callback_data="m_r" if pid is None else f"m_{pid}")])
+    rows.append([InlineKeyboardButton("رجوع", callback_data="m_r" if pid is None else f"m_{pid}")])
     return InlineKeyboardMarkup(rows)
 
 def kb_menu_quick(bid):
@@ -682,7 +682,7 @@ def kb_admins_inline():
             InlineKeyboardButton("🗑", callback_data=f"da_{a['id']}"),
         ])
     rows.append([InlineKeyboardButton("➕ إضافة مشرف", callback_data="aa")])
-    rows.append([InlineKeyboardButton("🔙 رجوع", callback_data="st_back")])
+    rows.append([InlineKeyboardButton("رجوع", callback_data="st_back")])
     return InlineKeyboardMarkup(rows)
 
 def kb_settings():
@@ -728,7 +728,7 @@ def kb_notif1_settings():
         InlineKeyboardButton(f'زر "نعم": {ok_text}',    callback_data="st_notif_ok_text"),
         InlineKeyboardButton(f'زر "لا": {cancel_text}', callback_data="st_notif_cancel_text"),
     ])
-    rows.append([InlineKeyboardButton("🔙 رجوع", callback_data="st_back")])
+    rows.append([InlineKeyboardButton("رجوع", callback_data="st_back")])
     return InlineKeyboardMarkup(rows)
 
 def kb_caption_settings():
@@ -739,7 +739,7 @@ def kb_caption_settings():
         rows.append([InlineKeyboardButton("🗑 حذف الكليشة",   callback_data="st_caption_clear")])
     else:
         rows.append([InlineKeyboardButton("➕ كتابة الكليشة", callback_data="st_caption_set")])
-    rows.append([InlineKeyboardButton("🔙 رجوع", callback_data="st_back")])
+    rows.append([InlineKeyboardButton("رجوع", callback_data="st_back")])
     return InlineKeyboardMarkup(rows)
 
 def kb_caption_btn_settings():
@@ -751,14 +751,14 @@ def kb_caption_btn_settings():
             InlineKeyboardButton("🗑", callback_data=f"st_capbtn_del_{b['id']}"),
         ])
     rows.append([InlineKeyboardButton("➕ إضافة زر رابط", callback_data="st_capbtn_add")])
-    rows.append([InlineKeyboardButton("🔙 رجوع", callback_data="st_back")])
+    rows.append([InlineKeyboardButton("رجوع", callback_data="st_back")])
     return InlineKeyboardMarkup(rows)
 
 def kb_backup_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📥 تحميل نسخة احتياطية", callback_data="st_backup_dl")],
         [InlineKeyboardButton("📤 رفع نسخة احتياطية",   callback_data="st_restore")],
-        [InlineKeyboardButton("🔙 رجوع",                 callback_data="st_back")],
+        [InlineKeyboardButton("رجوع",                 callback_data="st_back")],
     ])
 
 def get_stats() -> str:
@@ -1484,7 +1484,7 @@ async def cb_manage(update: Update, ctx):
     if d == "st_stats":
         await q.edit_message_text(get_stats(), parse_mode="Markdown",
                                   reply_markup=InlineKeyboardMarkup([[
-                                      InlineKeyboardButton("🔙 رجوع", callback_data="st_back")
+                                      InlineKeyboardButton("رجوع", callback_data="st_back")
                                   ]]))
         return
 
