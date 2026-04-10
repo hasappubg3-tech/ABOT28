@@ -808,6 +808,7 @@ def kb_settings():
         [InlineKeyboardButton(f"📢 رسالة الاشتراك {notif1_icon}", callback_data="st_notif1")],
         [InlineKeyboardButton("📊 الإحصائيات",                   callback_data="st_stats")],
         [InlineKeyboardButton("🔥 الملفات الترند",                callback_data="st_trending_0")],
+        [InlineKeyboardButton("📡 الإذاعة",                       callback_data="st_broadcast")],
     ])
 
 def kb_notif1_settings():
@@ -838,6 +839,20 @@ def kb_notif1_settings():
     ])
     rows.append([InlineKeyboardButton("رجوع", callback_data="st_back")])
     return InlineKeyboardMarkup(rows)
+
+def kb_broadcast():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📩 إرسال رسالة جديدة", callback_data="st_broadcast_send")],
+        [InlineKeyboardButton("رجوع",                  callback_data="st_back")],
+    ])
+
+def kb_broadcast_confirm():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ إرسال للجميع",  callback_data="st_broadcast_confirm"),
+            InlineKeyboardButton("❌ إلغاء",          callback_data="st_broadcast"),
+        ],
+    ])
 
 def kb_caption_settings():
     global_cap = get_global_caption()
@@ -1018,6 +1033,22 @@ def kb_confirm_delete(bid):
 async def set_panel(ctx, chat_id, text, markup=None):
     msg = await ctx.bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
     ctx.user_data["panel_id"] = msg.message_id
+
+# ── إذاعة رسالة لجميع المستخدمين ────────────────────────────────
+async def do_broadcast(bot, from_chat_id: int, msg_id: int) -> tuple:
+    """ينسخ الرسالة msg_id من from_chat_id إلى جميع المستخدمين. يُرجع (نجح, فشل)."""
+    import asyncio
+    user_ids = [r[0] for r in db().execute("SELECT user_id FROM user_stats").fetchall()]
+    success = 0
+    failed  = 0
+    for uid in user_ids:
+        try:
+            await bot.copy_message(chat_id=uid, from_chat_id=from_chat_id, message_id=msg_id)
+            success += 1
+        except Exception:
+            failed += 1
+        await asyncio.sleep(0.05)   # تجنب flood limits
+    return success, failed
 
 # ── إعادة إرسال نافذة التنبيه المعلقة (دون تحديث العداد) ─────────
 async def resend_notif_gate(target, uid, bid):
@@ -1294,6 +1325,20 @@ async def on_message(update: Update, ctx):
         finally:
             if os.path.exists(zip_tmp):
                 os.remove(zip_tmp)
+        return
+
+    # ── انتظار رسالة الإذاعة ─────────────────────────────────────
+    if state == "wait_broadcast_msg":
+        ctx.user_data.pop("state", None)
+        ctx.user_data["broadcast_from"] = chat_id
+        ctx.user_data["broadcast_mid"]  = m.message_id
+        total = db().execute("SELECT COUNT(*) FROM user_stats").fetchone()[0]
+        await m.reply_text(
+            f"📡 *معاينة الإذاعة*\n\nسيتم إرسال هذه الرسالة إلى *{total}* مستخدم.\n\n"
+            "هل تريد المتابعة؟",
+            parse_mode="Markdown",
+            reply_markup=kb_broadcast_confirm()
+        )
         return
 
     # ── انتظار اسم جديد للتعديل ───────────────────────────────────
@@ -1717,6 +1762,48 @@ async def cb_manage(update: Update, ctx):
     if d == "st_back":
         await q.edit_message_text("⚙️ *الاعدادات*", parse_mode="Markdown",
                                   reply_markup=kb_settings())
+        return
+
+    if d == "st_broadcast":
+        total = db().execute("SELECT COUNT(*) FROM user_stats").fetchone()[0]
+        await q.edit_message_text(
+            f"📡 *الإذاعة*\n\nعدد المستخدمين: *{total}*\n\n"
+            "اضغط الزر أدناه وأرسل الرسالة التي تريد بثها (نص، صورة، فيديو، ملف…).",
+            parse_mode="Markdown",
+            reply_markup=kb_broadcast()
+        )
+        return
+
+    if d == "st_broadcast_send":
+        ctx.user_data["state"] = "wait_broadcast_msg"
+        await q.edit_message_text(
+            "📩 أرسل الرسالة التي تريد إذاعتها الآن:\n_(نص أو صورة أو فيديو أو ملف)_",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("❌ إلغاء", callback_data="st_broadcast")
+            ]])
+        )
+        return
+
+    if d == "st_broadcast_confirm":
+        from_chat = ctx.user_data.pop("broadcast_from", None)
+        mid       = ctx.user_data.pop("broadcast_mid",  None)
+        if not from_chat or not mid:
+            await q.edit_message_text("⚠️ انتهت صلاحية الإذاعة، أعد المحاولة.",
+                                      reply_markup=kb_broadcast())
+            return
+        await q.edit_message_text("⏳ جاري الإرسال…")
+        success, failed = await do_broadcast(ctx.bot, from_chat, mid)
+        await q.edit_message_text(
+            f"📡 *انتهت الإذاعة*\n\n"
+            f"✅ نجح: *{success}*\n"
+            f"❌ فشل: *{failed}*\n"
+            f"📊 المجموع: *{success + failed}*",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("رجوع للإعدادات", callback_data="st_back")
+            ]])
+        )
         return
 
     if d == "st_caption":
