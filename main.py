@@ -2068,10 +2068,17 @@ async def cb_manage(update: Update, ctx):
                 data={"uid": uid, "study_min": study, "break_min": brk, "chat_id": chat_id},
                 name=f"pom_study_{uid}"
             )
-            await q.edit_message_text(
-                f"🍅 *بدأت جلسة الدراسة!* 💪\n\n"
-                f"⏱ ستصلك رسالة بعد *{study} دقيقة* عند انتهاء الوقت.\n\n"
-                f"_يمكنك الاستمرار في التصفح — سأذكّرك!_",
+            try:
+                await q.message.delete()
+            except Exception:
+                pass
+            await ctx.bot.send_message(
+                chat_id=chat_id,
+                text=(
+                    f"🍅 *بدأت جلسة الدراسة!* 💪\n\n"
+                    f"⏱ وقت الدراسة: *{study} دقيقة*\n"
+                    f"سأُذكّرك عند انتهاء الوقت ✅"
+                ),
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("✋ إيقاف الجلسة", callback_data="pom_stop")
@@ -2090,11 +2097,20 @@ async def cb_manage(update: Update, ctx):
                 data={"uid": uid, "study_min": study, "break_min": brk, "chat_id": chat_id},
                 name=f"pom_break_{uid}"
             )
-            await q.edit_message_text(
-                f"🧘 *استراحة {brk} دقيقة*\n\nاسترح جيداً — سأذكّرك عند انتهاء الاستراحة.",
+            try:
+                await q.message.delete()
+            except Exception:
+                pass
+            await ctx.bot.send_message(
+                chat_id=chat_id,
+                text=(
+                    f"🧘 *بدأت الاستراحة!*\n\n"
+                    f"⏱ مدة الاستراحة: *{brk} دقيقة*\n"
+                    f"سأُذكّرك عند انتهاء الاستراحة ✅"
+                ),
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("✋ إنهاء الجلسة", callback_data="pom_stop")
+                    InlineKeyboardButton("✋ إنهاء الجلسة كاملاً", callback_data="pom_stop")
                 ]])
             )
             return
@@ -2104,13 +2120,14 @@ async def cb_manage(update: Update, ctx):
                 job.schedule_removal()
             for job in ctx.job_queue.get_jobs_by_name(f"pom_break_{uid}"):
                 job.schedule_removal()
-            s = get_pomodoro_settings(uid)
-            await q.edit_message_text(
-                "✋ *تم إيقاف الجلسة.*\n\nأحسنت على المحاولة! يمكنك البدء مرة أخرى في أي وقت 💪",
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("▶️ ابدأ جلسة جديدة", callback_data="pom_start")
-                ]])
+            try:
+                await q.message.delete()
+            except Exception:
+                pass
+            await ctx.bot.send_message(
+                chat_id=chat_id,
+                text="✋ *تم إيقاف الجلسة.*\n\nأحسنت على المحاولة! 💪",
+                parse_mode="Markdown"
             )
             return
 
