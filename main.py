@@ -820,7 +820,8 @@ def kb_item_rating(iid: int):
 
 def kb_item_rating_choices(iid: int):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("⭐" * i, callback_data=f"rate_set_{iid}_{i}") for i in range(1, 6)],
+        [InlineKeyboardButton("⭐" * i, callback_data=f"rate_set_{iid}_{i}") for i in range(1, 4)],
+        [InlineKeyboardButton("⭐" * i, callback_data=f"rate_set_{iid}_{i}") for i in range(4, 6)],
         [InlineKeyboardButton("رجوع", callback_data=f"rate_back_{iid}")],
     ])
 
