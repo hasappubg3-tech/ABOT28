@@ -2093,7 +2093,6 @@ async def cb_manage(update: Update, ctx):
             await q.answer("⚠️ لا يوجد زر خاص.", show_alert=True); return
         dest = d[len("st_special_moveto_"):]
         new_pid = None if dest == "root" else int(dest)
-        # لا يمكن نقله داخل نفسه
         if new_pid == sp["id"]:
             await q.answer("⚠️ لا يمكن نقل الزر داخل نفسه.", show_alert=True); return
         move_special_btn(sp["id"], new_pid)
@@ -2104,6 +2103,9 @@ async def cb_manage(update: Update, ctx):
             parse_mode="Markdown",
             reply_markup=kb_special_settings()
         )
+        # نُحدِّث الكيبورد ليعكس الوضع الجديد عند المستوى الحالي
+        cur_pid = ctx.user_data.get("pid")
+        await q.message.reply_text("🔄", reply_markup=build_kb(uid, cur_pid))
         return
 
     if d == "st_special_del":
