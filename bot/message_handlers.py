@@ -683,11 +683,12 @@ async def on_message(update: Update, ctx):
                 await set_panel(ctx, chat_id, "اختر نوع الزر الجديد:", kb_add_type())
             return
         if text in (BTN_SWAP, "تغير", "تغيير"):
-            btns = get_buttons(pid)
+            current_pid = ctx.user_data.get("pid")
+            btns = get_buttons(current_pid)
             if len(btns) < 2:
                 await m.reply_text("⚠️ يجب أن يكون هناك زران على الأقل للتبديل.")
             else:
-                await set_panel(ctx, chat_id, "🔀 *اختر الزر الأول:*", kb_swap_select(pid))
+                await set_panel(ctx, chat_id, "🔀 *اختر الزر الأول:*", kb_swap_select(current_pid))
             return
         if text == BTN_SETTINGS:
             await set_panel(ctx, chat_id, "⚙️ *الاعدادات*", kb_settings())

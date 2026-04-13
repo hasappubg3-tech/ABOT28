@@ -918,11 +918,13 @@ async def cb_manage(update: Update, ctx):
 
     # ── تنقل في لوحة الإدارة العامة ──────────────────────────────
     if d == "m_r":
+        ctx.user_data["pid"] = None
         await q.edit_message_text("⚙️ *إدارة الأزرار*:", parse_mode="Markdown",
                                   reply_markup=kb_manage()); return
 
     if d.startswith("m_"):
         ep = int(d[2:]); b = get_btn(ep)
+        ctx.user_data["pid"] = ep
         if b and b["type"] == "content":
             items = get_items(ep)
             await q.edit_message_text(f"📄 *{b['label']}*\n_{len(items)} عنصر_",
