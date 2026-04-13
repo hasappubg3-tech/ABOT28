@@ -160,7 +160,6 @@ async def on_message(update: Update, ctx):
                 )
                 save_user_reply_session(target_uid, copied.message_id)
                 set_file_convo_active(target_uid)
-                await m.reply_text("✅ تم إرسال ردك للمستخدم.")
             except Exception as e:
                 logging.warning(f"file direct reply to user failed: {e}")
                 await m.reply_text("⚠️ تعذر إرسال الرد للمستخدم.")
