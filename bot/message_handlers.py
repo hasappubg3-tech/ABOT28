@@ -7,7 +7,12 @@ async def cmd_start(update: Update, ctx):
     if not kb:
         await update.message.reply_text("👋 أهلاً! لا توجد أزرار متاحة حالياً.")
         return
-    await update.message.reply_text("👋 أهلاً!", reply_markup=kb)
+    await update.message.reply_text("يا اهلا بيك في بوت الأمير الدراسي 😊
+
+اختار الي تحتاجة خلال الازرار في الاسفل 👇
+
+واذا يوجد نقص معين ملزمة او ملخص والخ تواصل ويانا @Alameer72bot وراح يتم اضافته ان شاء الله 🌹
+", reply_markup=kb)
     if not is_admin(uid):
         inc_user_sessions(uid)
 
