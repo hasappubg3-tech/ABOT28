@@ -519,6 +519,16 @@ async def cb_manage(update: Update, ctx):
         correct = parts[2] == "1"
         await q.answer("✅ تم تسجيل إجابتك" if correct else "تم تسجيلها")
         try:
+            await q.message.delete()
+        except Exception:
+            try:
+                await q.edit_message_reply_markup(reply_markup=None)
+            except Exception:
+                pass
+        session = get_exam_session(ctx, bid)
+        if not session:
+            return
+        try:
             if correct:
                 await q.message.reply_text(
                     "أحسنت يا بطل 🏆",
@@ -531,10 +541,6 @@ async def cb_manage(update: Update, ctx):
                 )
         except Exception:
             pass
-        session = get_exam_session(ctx, bid)
-        if not session:
-            await q.message.reply_text("⚠️ انتهت الجلسة. اضغط على الاختبار مجدداً للبدء.")
-            return
         if qid not in session.get("graded_qids", []):
             session.setdefault("graded_qids", []).append(qid)
             progress = mark_exam_answer(uid, bid, session["total"], correct)
@@ -544,10 +550,6 @@ async def cb_manage(update: Update, ctx):
             current_idx = session["q_ids"].index(qid)
         except ValueError:
             current_idx = 0
-        try:
-            await q.edit_message_reply_markup(reply_markup=None)
-        except Exception:
-            pass
         next_idx = current_idx + 1
         if next_idx >= session["total"]:
             ctx.user_data.pop(_exam_session_key(bid), None)
