@@ -256,9 +256,9 @@ def clone_btn(source_bid, pid, add_after="END", add_before=None, new_row=1):
             })
 
     elif t == "compound":
-        internal = list(_col("buttons").find(
-            {"parent_id": source_bid, "deleted": {"$ne": 1}}
-        ).sort([("ord", 1), ("id", 1)]))
+        # إذا كان الزر الأصل محذوفاً، أبناؤه محذوفون معه — نُضمّنهم للاستعادة الكاملة
+        child_filter = {"parent_id": source_bid} if src.get("deleted") else {"parent_id": source_bid, "deleted": {"$ne": 1}}
+        internal = list(_col("buttons").find(child_filter).sort([("ord", 1), ("id", 1)]))
         for child in internal:
             child_new_id = _next_id("buttons")
             _col("buttons").insert_one({
@@ -282,9 +282,9 @@ def clone_btn(source_bid, pid, add_after="END", add_before=None, new_row=1):
 
     elif t in ("menu", "exam_group"):
         # استنساخ عميق — يكرر نفسه لكل زر داخلي بأي عمق
-        children = list(_col("buttons").find(
-            {"parent_id": source_bid, "deleted": {"$ne": 1}}
-        ).sort([("ord", 1), ("id", 1)]))
+        # إذا كان الزر الأصل محذوفاً، أبناؤه محذوفون معه — نُضمّنهم للاستعادة الكاملة
+        child_filter = {"parent_id": source_bid} if src.get("deleted") else {"parent_id": source_bid, "deleted": {"$ne": 1}}
+        children = list(_col("buttons").find(child_filter).sort([("ord", 1), ("id", 1)]))
         last_cloned_child = None
         for child in children:
             if last_cloned_child is None:
