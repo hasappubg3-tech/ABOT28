@@ -1110,6 +1110,44 @@ async def on_message(update: Update, ctx):
         await m.reply_text("✅", reply_markup=build_kb(uid, pid))
         return
 
+    # ── ملزمة: انتظار معلومة ناقصة ───────────────────────────────
+    if state in ("wait_mlz_subject", "wait_mlz_teacher", "wait_mlz_grade", "wait_mlz_year"):
+        val = m.text.strip() if m.text else ""
+        if not val:
+            await m.reply_text("⚠️ أرسل نصاً صحيحاً."); return
+        key_map = {
+            "wait_mlz_subject": "mlz_subject",
+            "wait_mlz_teacher": "mlz_teacher",
+            "wait_mlz_grade":   "mlz_grade",
+            "wait_mlz_year":    "mlz_year",
+        }
+        ctx.user_data[key_map[state]] = val
+        ctx.user_data.pop("state", None)
+        await _ask_next_missing(m, ctx, uid, chat_id)
+        return
+
+    # ── ملزمة: انتظار الوصف اليدوي ───────────────────────────────
+    if state == "wait_mlz_desc":
+        val = m.text.strip() if m.text else ""
+        if not val:
+            await m.reply_text("⚠️ أرسل نصاً صحيحاً للوصف."); return
+        ctx.user_data["mlz_desc"] = val
+        ctx.user_data["state"] = "wait_mlz_type"
+        await m.reply_text(
+            "📌 *ما نوع الملزمة؟*\n_(مثال: مراجعة، ملخص، نموذج امتحان)_",
+            parse_mode="Markdown"
+        )
+        return
+
+    # ── ملزمة: انتظار النوع ───────────────────────────────────────
+    if state == "wait_mlz_type":
+        val = m.text.strip() if m.text else ""
+        if not val:
+            await m.reply_text("⚠️ أرسل نصاً للنوع."); return
+        ctx.user_data.pop("state", None)
+        await finish_mlz_flow(m, ctx, uid, chat_id, ctx.bot, val)
+        return
+
     # ── تحليل صورة بالذكاء الاصطناعي (للمشرفين فقط) ─────────────
     if not state and m.photo and is_admin(uid):
         import re
@@ -1155,6 +1193,15 @@ async def on_message(update: Update, ctx):
                     await wait_msg.edit_text("⏳ جاري تحليل الصورة...")
                     await _process_image_batch(wait_msg, m, ctx, uid, pid, batch, btn_type)
                 return
+
+    # ── ملزمة: ملف جديد من المشرف (خارج وضع الإضافة اليدوية) ────────
+    if not state and is_admin(uid) and (
+        m.document or m.video or m.audio or m.voice or
+        (m.photo and not (m.caption or "").strip().startswith("."))
+    ):
+        handled = await start_mlz_flow(m, ctx, uid, chat_id)
+        if handled:
+            return
 
     # ── إشارة النقطة للذكاء الاصطناعي (للمشرفين فقط) ────────────
     if not state and text.startswith(".") and is_admin(uid):

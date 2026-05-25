@@ -80,6 +80,17 @@ async def cb_manage(update: Update, ctx):
                     pass
         return
 
+    # ── ملزمة: تأكيد أو تعديل ────────────────────────────────────────────
+    if d in ("mlz_confirm", "mlz_edit"):
+        if not is_admin(uid):
+            await q.answer("⛔ غير مصرح.", show_alert=True); return
+        chat_id = q.message.chat_id
+        if d == "mlz_confirm":
+            await after_mlz_confirm(q, ctx, uid, chat_id)
+        else:
+            await after_mlz_edit(q, ctx, uid, chat_id)
+        return
+
     # ── رد المشرف على المستخدم (زر الرد) ────────────────────────────────
     if d.startswith("freply_"):
         if not is_file_supervisor(uid):

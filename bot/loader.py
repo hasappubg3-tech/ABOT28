@@ -8,6 +8,7 @@ MODULE_NAMES = [
     "message_handlers",
     "callback_handlers",
     "ai_backup_payments",
+    "mlz_feature",
     "lifecycle",
 ]
 
